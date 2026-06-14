@@ -138,6 +138,70 @@ class ModelCacheTests(unittest.TestCase):
         self.assertEqual(second_args.updated_from, "train_args")
 
 
+class PredictionResultCacheTests(unittest.TestCase):
+    def setUp(self) -> None:
+        service._PREDICTION_CACHE.clear()
+
+    def tearDown(self) -> None:
+        service._PREDICTION_CACHE.clear()
+
+    def test_pipeline_reuses_cached_prediction_for_identical_request(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            input_csv = repo_root / "prepared.csv"
+            input_csv.write_text("SMILES,sequence\nC,AAAA\n", encoding="utf-8")
+            records_file = repo_root / "prepared.json.gz"
+            records_file.write_bytes(b"records")
+            output_csv = repo_root / "prepared_output.csv"
+            checkpoint = repo_root / "checkpoints" / "fold_0" / "model_0" / "model.pt"
+            checkpoint.parent.mkdir(parents=True)
+            checkpoint.write_bytes(b"checkpoint")
+
+            paths = service.PreparedInputPaths(
+                input_csv=str(input_csv),
+                records_file=str(records_file),
+                output_csv=str(output_csv),
+            )
+            request = PredictionRequest(
+                parameter="kcat",
+                input_file=str(input_csv),
+                checkpoint_dir=str(checkpoint.parent.parent.parent),
+                repo_root=str(repo_root),
+            )
+
+            def write_final(parameter, prepared_paths, repo_root_arg, results_dir):
+                final_output = Path(results_dir) / Path(prepared_paths.output_csv).name
+                final_output.parent.mkdir(parents=True, exist_ok=True)
+                final_output.write_text("SMILES,kcat\nC,1.23\n", encoding="utf-8")
+                return str(final_output)
+
+            with patch(
+                "catpred.inference.service.prepare_prediction_inputs",
+                return_value=paths,
+            ), patch(
+                "catpred.inference.service.run_inprocess_prediction",
+            ) as runner, patch(
+                "catpred.inference.service._write_postprocessed_predictions",
+                side_effect=write_final,
+            ) as postprocess:
+                first = service.run_inprocess_prediction_pipeline(
+                    request,
+                    results_dir=str(repo_root / "results" / "first"),
+                )
+                second = service.run_inprocess_prediction_pipeline(
+                    request,
+                    results_dir=str(repo_root / "results" / "second"),
+                )
+                first_text = Path(first).read_text(encoding="utf-8")
+                second_text = Path(second).read_text(encoding="utf-8")
+
+        runner.assert_called_once()
+        postprocess.assert_called_once()
+        self.assertEqual(first_text, "SMILES,kcat\nC,1.23\n")
+        self.assertEqual(second_text, "SMILES,kcat\nC,1.23\n")
+        self.assertNotEqual(first, second)
+
+
 class FastPredictArgsTests(unittest.TestCase):
     def test_fast_predict_args_save_components_without_individual_predictions(self) -> None:
         class FakePredictArgs:
