@@ -41,6 +41,10 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Set up uv
+        if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != '' }}
+        uses: astral-sh/setup-uv@v6
+
       - name: Install Vercel CLI
         if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != '' }}
         run: npm install --global vercel@latest
