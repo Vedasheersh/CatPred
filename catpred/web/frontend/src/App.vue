@@ -250,9 +250,13 @@ function onImportCsv(text: string) {
 
 .grid {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.45fr);
   gap: 1rem;
   align-items: start;
+}
+
+.grid > * {
+  min-width: 0;
 }
 
 @media (max-width: 1024px) {

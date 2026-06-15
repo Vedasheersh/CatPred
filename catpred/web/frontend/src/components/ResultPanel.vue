@@ -61,6 +61,17 @@ function tableKeys(entry: PredictionResultEntry): string[] {
   if (!rows.length) return []
   return Object.keys(rows[0])
 }
+
+function columnClass(key: string): string {
+  const normalized = key.toLowerCase()
+  if (normalized === 'sequence') return 'cell-sequence'
+  if (normalized === 'smiles') return 'cell-smiles'
+  if (normalized === 'pdbpath') return 'cell-id'
+  if (normalized.includes('model') || normalized.includes('prediction') || normalized.includes('var')) {
+    return 'cell-number'
+  }
+  return ''
+}
 </script>
 
 <template>
@@ -150,17 +161,30 @@ function tableKeys(entry: PredictionResultEntry): string[] {
 
         <!-- Detail table per parameter -->
         <details class="details-table">
-          <summary>View detailed {{ PARAMETER_LABELS[entry.parameter] }} output table</summary>
-          <div class="table-wrap">
+          <summary>
+            <span>View detailed {{ PARAMETER_LABELS[entry.parameter] }} output table</span>
+            <span class="detail-count">{{ entry.response.preview_rows.length }} rows</span>
+          </summary>
+          <div class="table-wrap" tabindex="0" aria-label="Detailed prediction output table">
             <table>
               <thead>
                 <tr>
-                  <th v-for="key in tableKeys(entry)" :key="key">{{ key }}</th>
+                  <th
+                    v-for="key in tableKeys(entry)"
+                    :key="key"
+                    :class="columnClass(key)"
+                    :title="key"
+                  >{{ key }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(row, idx) in entry.response.preview_rows" :key="idx">
-                  <td v-for="key in tableKeys(entry)" :key="key">{{ formatCell(row[key]) }}</td>
+                  <td
+                    v-for="key in tableKeys(entry)"
+                    :key="key"
+                    :class="columnClass(key)"
+                    :title="formatCell(row[key])"
+                  >{{ formatCell(row[key]) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -178,6 +202,8 @@ function tableKeys(entry: PredictionResultEntry): string[] {
   border-radius: var(--radius-lg);
   padding: 1rem;
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .panel-head {
@@ -221,7 +247,7 @@ function tableKeys(entry: PredictionResultEntry): string[] {
 }
 
 .result-group {
-  /* No extra styling needed, gap handles separation */
+  min-width: 0;
 }
 
 .group-head {
@@ -378,10 +404,15 @@ function tableKeys(entry: PredictionResultEntry): string[] {
   margin-top: 0.5rem;
   border-top: 1px solid var(--border);
   padding-top: 0.5rem;
+  min-width: 0;
 }
 
 .details-table summary {
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 500;
@@ -390,14 +421,32 @@ function tableKeys(entry: PredictionResultEntry): string[] {
   color: var(--text-tertiary);
 }
 
+.details-table[open] summary {
+  color: var(--text-secondary);
+}
+
+.detail-count {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  text-transform: none;
+}
+
 .table-wrap {
   margin-top: 0.5rem;
   overflow: auto;
+  max-width: 100%;
+  max-height: min(52vh, 520px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  overscroll-behavior: contain;
 }
 
 table {
-  width: 100%;
-  min-width: 600px;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 th, td {
@@ -406,15 +455,40 @@ th, td {
   padding: 0.375rem 0.5rem;
   font-size: 0.8rem;
   color: var(--text-secondary);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   font-family: var(--font-mono);
   font-size: 0.65rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-tertiary);
+  background: var(--bg-muted);
+}
+
+.cell-smiles {
+  max-width: 22rem;
+}
+
+.cell-sequence {
+  max-width: 30rem;
+}
+
+.cell-id {
+  max-width: 10rem;
+}
+
+.cell-number {
+  max-width: 8rem;
+  text-align: right;
 }
 
 @media (max-width: 640px) {
